@@ -76,18 +76,29 @@ target_sources(AudioPluginExample
     PRIVATE
         PluginEditor.cpp
         PluginProcessor.cpp
-        SynthVoice.cpp)
+        )
 
 add_library(ui 
     STATIC 
+    UI/OscComponent.cpp UI/OscComponent.h
     UI/AdsrComponent.cpp UI/AdsrComponent.h
-    UI/OscComponent.cpp UI/OscComponent.h)
+    UI/WaveComponent.cpp UI/WaveComponent.h
+    UI/FilterComponent.cpp UI/FilterComponent.h
+    UI/RotarySliderWithLabel.cpp UI/RotarySliderWithLabel.h
+    UI/VerticalSliderWithLabel.cpp UI/VerticalSliderWithLabel.h
+    UI/HorizontalSliderWithLabel.cpp UI/HorizontalSliderWithLabel.h
+    )
 
 add_library(data
     STATIC 
     DATA/AdsrData.cpp DATA/AdsrData.h
     DATA/OscData.cpp DATA/OscData.h
+    DATA/FilterData.cpp DATA/FilterData.h
+    DATA/MySynth.cpp DATA/MySynth.h 
+    DATA/SynthVoice.cpp DATA/SynthVoice.h
+    DATA/SynthSound.h
     )   
+
 
 target_link_libraries(  ui
 PRIVATE
@@ -108,8 +119,6 @@ PUBLIC
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
 )
-
-
 
 
 

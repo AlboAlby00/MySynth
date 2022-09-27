@@ -4,13 +4,14 @@
 //==============================================================================
 TapSynthAudioProcessorEditor::TapSynthAudioProcessorEditor (TapSynthAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p), 
-        adsrComponent (audioProcessor.valueTree), oscComponent(audioProcessor.valueTree)
+        osc1{audioProcessor.valueTree,1},
+        osc2{audioProcessor.valueTree,2}
 {
-    setSize (400, 300);
+    setSize (900, 500);
+    setResizable(true,true);
 
-
-    addAndMakeVisible(adsrComponent);
-    addAndMakeVisible(oscComponent);
+    addAndMakeVisible(osc1);
+    addAndMakeVisible(osc2);
 
 }
 
@@ -29,7 +30,7 @@ void TapSynthAudioProcessorEditor::paint (juce::Graphics& g)
 
 void TapSynthAudioProcessorEditor::resized()
 {
-    adsrComponent.setBounds(getWidth()/2,0,getWidth()/2,getHeight());
-    oscComponent.setBounds(0,0,getWidth()/2,getHeight());
+    osc1.setBounds(0,0,getWidth(),getHeight()/3);
+    osc2.setBounds(0,getHeight()/3,getWidth(),getHeight()/3);
 }
 

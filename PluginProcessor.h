@@ -1,8 +1,9 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "SynthVoice.h"
-#include "SynthSound.h"
+#include "DATA/SynthVoice.h"
+#include "DATA/SynthSound.h"
+#include "DATA/MySynth.h"
 
 //==============================================================================
 /**
@@ -48,14 +49,19 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     //==============================================================================
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> createSynthParameters(int synth_index);
+    MySynth& getSynth1(){return synth1;}
+    MySynth& getSynth2(){return synth1;}  
+
+    juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
+
     juce::AudioProcessorValueTreeState valueTree;
-    
 
 private:
 
-    juce::Synthesiser synth;
-
-    juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
+    MySynth synth1;
+    MySynth synth2;
+    const int numOscillators{2};
     
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TapSynthAudioProcessor)

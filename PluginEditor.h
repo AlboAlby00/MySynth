@@ -1,8 +1,8 @@
 #pragma once
 
 #include "PluginProcessor.h"
-#include "UI/AdsrComponent.h"
 #include "UI/OscComponent.h"
+
 
 //==============================================================================
 /**
@@ -24,8 +24,8 @@ private:
 
     void setSliderParams(juce::Slider& slider);
 
-    AdsrComponent adsrComponent;
-    OscComponent oscComponent;
+    OscComponent osc1;
+    OscComponent osc2;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TapSynthAudioProcessorEditor)
 };

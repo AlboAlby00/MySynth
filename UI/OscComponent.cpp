@@ -1,45 +1,26 @@
 #include "OscComponent.h"
 
-OscComponent::OscComponent(juce::AudioProcessorValueTreeState& valueTree) 
+OscComponent::OscComponent (juce::AudioProcessorValueTreeState& valueTree, int index) :
+    waveComponent{valueTree,index},adsrComponent{valueTree,index},filterComponent{valueTree,index}
 {
-    juce::StringArray choices {"Sine","Saw","Square","Triangle"};
-    waveTypeSelector.addItemList(choices,1);
-    waveTypeAttachment = 
-        std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>
-                            (valueTree,"OSC_WAVE",waveTypeSelector);
-
-    fmDepthSlider.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    fmDepthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow,true,getWidth()/2,20);
-    fmDepthAttachment =
-        std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>
-                            (valueTree,"FM_DEPTH",fmDepthSlider);
-
-    fmFrequencySlider.setSliderStyle(juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-    fmFrequencySlider.setTextBoxStyle(juce::Slider::TextBoxBelow,true,getWidth()/2,20);
-    fmFrequencyAttachment =
-        std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>
-                            (valueTree,"FM_FREQ",fmFrequencySlider);
-
-    addAndMakeVisible(waveTypeSelector);
-    addAndMakeVisible(fmDepthSlider);
-    addAndMakeVisible(fmFrequencySlider);
+    addAndMakeVisible(waveComponent);
+    addAndMakeVisible(adsrComponent);
+    addAndMakeVisible(filterComponent);
 }
 
-void OscComponent::paint(juce::Graphics& g)
+OscComponent::~OscComponent()
 {
-    g.fillAll(juce::Colours::black);
+
+}
+
+void OscComponent::paint (juce::Graphics& g)
+{
+    
 }
 
 void OscComponent::resized()
 {
-    const int waveTypeSelectorHeight = getHeight()/10;
-    const int sliderLenght = getWidth()/2;
-    waveTypeSelector.setBounds(0,0,100,waveTypeSelectorHeight);
-    fmDepthSlider.setBounds(0,waveTypeSelectorHeight,sliderLenght,sliderLenght);
-    fmFrequencySlider.setBounds(sliderLenght,waveTypeSelectorHeight,sliderLenght,sliderLenght);
-
+    waveComponent.setBounds(0,0,getWidth()/3,getHeight());
+    adsrComponent.setBounds(getWidth()/3,0,getWidth()/3,getHeight());  
+    filterComponent.setBounds(2*getWidth()/3,0,getWidth()/3,getHeight());
 }
-
-
-
-

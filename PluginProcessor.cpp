@@ -5,18 +5,22 @@
 TapSynthAudioProcessor::TapSynthAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
      : AudioProcessor (BusesProperties()
-                     #if ! JucePlugin_IsMidiEffect
-                      #if ! JucePlugin_IsSynth
-                       .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
-                      #endif
-                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
-                     #endif
-                       ), 
-                       valueTree(*this,nullptr,"VALUE_TREE",createParameters())
+            .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
+                       ),
+                valueTree{*this,nullptr,"VALUE_TREE",createParameters()},synth1{valueTree,1},synth2{valueTree,2}
 #endif
+    
 {
-    synth.addSound (new SynthSound());
-    synth.addVoice (new SynthVoice());
+    synth1.addSound (new SynthSound());
+    synth2.addSound (new SynthSound());
+    for(int i=0; i<8; i++)
+    {
+        synth1.addVoice (new SynthVoice());
+        synth2.addVoice(new SynthVoice());
+    }
+    
+    
+    //std::cout<<"n channels: "<<getTotalNumOutputChannels()<<std::endl;
 }
 
 TapSynthAudioProcessor::~TapSynthAudioProcessor()
@@ -89,14 +93,8 @@ void TapSynthAudioProcessor::changeProgramName (int index, const juce::String& n
 //==============================================================================
 void TapSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    synth.setCurrentPlaybackSampleRate (sampleRate);
-    for(int voiceIndex=0; voiceIndex<synth.getNumVoices(); voiceIndex++){
-       if( auto voice = dynamic_cast<SynthVoice*>(synth.getVoice(voiceIndex))){
-           voice->prepareToPlay(sampleRate,samplesPerBlock,getNumOutputChannels());
-           OscData& oscillator = voice->getOscillator();
-           oscillator.setWaveType(1);
-       }
-    }
+    synth1.prepareToPlay(sampleRate,samplesPerBlock,getTotalNumOutputChannels());
+    synth2.prepareToPlay(sampleRate,samplesPerBlock,getTotalNumOutputChannels());
 }
 
 void TapSynthAudioProcessor::releaseResources()
@@ -105,78 +103,35 @@ void TapSynthAudioProcessor::releaseResources()
     // spare memory, etc.
 }
 
-#ifndef JucePlugin_PreferredChannelConfigurations
+
 bool TapSynthAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
-  #if JucePlugin_IsMidiEffect
-    juce::ignoreUnused (layouts);
-    return true;
-  #else
-    // This is the place where you check if the layout is supported.
-    // In this template code we only support mono or stereo.
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
-        return false;
-
-    // This checks if the input layout matches the output layout
-   #if ! JucePlugin_IsSynth
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
-        return false;
-   #endif
+    const juce::AudioChannelSet& mainInput  = layouts.getMainInputChannelSet();
+    const juce::AudioChannelSet& mainOutput = layouts.getMainOutputChannelSet();
 
     return true;
-  #endif
 }
-#endif
 
 void TapSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
                                 juce::MidiBuffer& midiMessages)
 {
+    
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
+    //std::cout<<" buffer size: "<<buffer.getNumChannels();
+    //std::cout<<"n in channels after: "<<totalNumInputChannels<<std::endl;
+    //std::cout<<"n out channels after: "<<totalNumOutputChannels<<std::endl;
+    
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+        buffer.clear (i, 0, buffer.getNumSamples()); 
 
-    for(int voiceIndex=0; voiceIndex<synth.getNumVoices(); ++voiceIndex)
-    {
-        if(auto voice = dynamic_cast<SynthVoice*> (synth.getVoice(voiceIndex)))
-        {
-            OscData& oscillator = voice->getOscillator();
+    synth1.updateParameters();
+    synth2.updateParameters();
 
-            //ADSR
-
-            auto attack = valueTree.getRawParameterValue("ATTACK");
-            auto decay = valueTree.getRawParameterValue("DECAY");
-            auto sustain = valueTree.getRawParameterValue("SUSTAIN");
-            auto release = valueTree.getRawParameterValue("RELEASE");
-
-            float attackValue = attack->load();
-            float decayValue = decay->load();
-            float sustainValue = sustain->load();
-            float releaseValue = release->load();
-
-            voice->updateAdsr(attackValue,decayValue,sustainValue,releaseValue);
-
-            //OSC
-
-            auto waveType = valueTree.getRawParameterValue("OSC_WAVE");
-            int selectedWave = waveType->load();
-
-            oscillator.setWaveType(selectedWave);
-
-            //FM
-
-            auto frequency = valueTree.getRawParameterValue("FM_FREQ");
-            float frequencyValue = frequency->load();
-            auto depth = valueTree.getRawParameterValue("FM_DEPTH");
-            float depthValue = depth->load();
-            
-            oscillator.setFmParams(depthValue,frequencyValue);     
-        }
-    }
-    synth.renderNextBlock(buffer,midiMessages,0,buffer.getNumSamples());
+    synth1.renderNextBlock(buffer,midiMessages,0,buffer.getNumSamples());
+    synth2.renderNextBlock(buffer,midiMessages,0,buffer.getNumSamples());
 }
 
 //==============================================================================
@@ -213,36 +168,83 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 
 juce::AudioProcessorValueTreeState::ParameterLayout TapSynthAudioProcessor::createParameters()
 {
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
+    
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> synth1params = createSynthParameters(1);
+    layout.add(synth1params.begin(),synth1params.end());
+
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> synth2params = createSynthParameters(2);
+    layout.add(synth2params.begin(),synth2params.end());
+
+    return layout;
+
+}
+
+std::vector<std::unique_ptr<juce::RangedAudioParameter>> TapSynthAudioProcessor::createSynthParameters(int synth_index)
+{
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
+    //WAVE
+
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
-         "OSC_WAVE","osc_wave",   juce::StringArray{"Sine","Saw", "Square","Triangle"}, 0        
-    ));
-
-    //ADSR
+         "OSC_WAVE"+synth_index,"osc_wave",   juce::StringArray{"Sine","Saw", "Square","Triangle"}, 0        
+        ));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-         "ATTACK","Attack", juce::NormalisableRange<float>{0.1f,1.0f},0.1f        
-    ));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-         "DECAY","Decay", juce::NormalisableRange<float>{0.1f,1.0f},0.1f        
-    ));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-         "SUSTAIN","Sustain", juce::NormalisableRange<float>{0.1f,1.0f},1.0f        
-    ));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-         "RELEASE","Release", juce::NormalisableRange<float>{0.1f,3.0f},0.4f        
-    ));
-
-    //FM 
+            "GAIN"+synth_index,"Gain", juce::NormalisableRange<float>{0.0f,1.0f,0.001f,0.3f},0.1f        
+        ));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-         "FM_FREQ","FM Frequency", juce::NormalisableRange<float>{0.1f,1000.0f},50.0f        
-    ));
+            "PAN"+synth_index,"Pan", juce::NormalisableRange<float>{-1.0f,1.0f,0.01f},0.0f        
+        ));
+
+        //ADSR
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-         "FM_DEPTH","FM Depth", juce::NormalisableRange<float>{0.0f,1000.0f},500.0f        
-    ));
+            "ATTACK"+synth_index,"Attack", juce::NormalisableRange<float>{0.1f,1.0f,0.01f},0.1f        
+        ));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+            "DECAY"+synth_index,"Decay", juce::NormalisableRange<float>{0.1f,1.0f,0.01f},0.1f        
+        ));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+            "SUSTAIN"+synth_index,"Sustain", juce::NormalisableRange<float>{0.1f,1.0f,0.01f},1.0f        
+        ));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+            "RELEASE"+synth_index,"Release", juce::NormalisableRange<float>{0.1f,3.0f,0.01f},0.4f        
+        ));
 
-    return {params.begin(), params.end()};
+        //FM 
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+            "FM_FREQ"+synth_index,"FM Frequency", juce::NormalisableRange<float>{0.1f,1000.0f,0.01f,0.2f},0.0f        
+        ));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+            "FM_DEPTH"+synth_index,"FM Depth", juce::NormalisableRange<float>{0.0f,1000.0f,0.01f,0.2f},0.0f        
+        ));
+
+
+        //FILTER
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+            "FILTER_ACTIVE"+synth_index,"Filter Active",   false        
+        ));
+
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+            "FILTER_TYPE"+synth_index,"Filter Type",   juce::StringArray{"LowPass","BandPass", "HighPass"}, 0        
+        ));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+            "FILTER_FREQ"+synth_index,"Frequency", juce::NormalisableRange<float>{20.0f,20000.0f,0.1f,0.2f},0.0f        
+        ));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+            "FILTER_RES"+synth_index,"Resonance", juce::NormalisableRange<float>{1.0f,10.0f,0.1f},1.0f        
+        ));
+
+    return params;
 }
+
+
+
+
